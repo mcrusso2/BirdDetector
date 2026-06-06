@@ -11,26 +11,37 @@ import fiftyone.zoo as foz
 # ---------------------- CONFIG ----------------------
 #
 
-POSITIVE_CLASSES = {
-    "Bird": "bird_present",
-    "Bird of prey": "bird_present",
-    "Water bird": "bird_present",
-    "Songbird": "bird_present",
-    "Owl": "bird_present",
-    "Duck": "bird_present",
-    "Goose": "bird_present",
-    "Swan": "bird_present",
-    "Eagle": "bird_present",
-    "Hawk": "bird_present",
-    "Falcon": "bird_present",
-    "Parrot": "bird_present",
-    "Penguin": "bird_present",
-    "Woodpecker": "bird_present",
-    "Sparrow": "bird_present",
-    "Finch": "bird_present",
-    "Crow": "bird_present",
-    "Raven": "bird_present",
-    "Seagull": "bird_present",
+# Valid Open Images bird classes grouped into subclasses
+BIRD_SUBCLASSES = {
+    # Small birds
+    "Sparrow": "small_bird",
+    "Finch": "small_bird",
+
+    # Raptors
+    "Eagle": "raptor",
+    "Hawk": "raptor",
+    "Falcon": "raptor",
+    "Owl": "raptor",
+    "Bird of prey": "raptor",
+
+    # Waterfowl
+    "Duck": "waterfowl",
+    "Goose": "waterfowl",
+    "Swan": "waterfowl",
+    "Water bird": "waterfowl",
+
+    # Corvids
+    "Crow": "corvid",
+    "Raven": "corvid",
+
+    # Other distinct groups
+    "Parrot": "parrot",
+    "Penguin": "penguin",
+    "Woodpecker": "woodpecker",
+    "Seagull": "seagull",
+
+    # Generic fallback
+    "Bird": "generic_bird",
 }
 
 PRIMARY_ADVERSARY_CLASSES = {
@@ -53,30 +64,40 @@ AUX_NEGATIVE_CLASSES = {
     "Fence": "no_bird",
 }
 
+# Only valid Open Images classes included
 PRESETS = {
-    "balanced_small": {
-        # Positive classes
-        "Bird": 5000,
-        "Bird of prey": 2000,
-        "Songbird": 3000,
-        "Water bird": 2000,
-        "Owl": 1000,
-        "Duck": 1000,
-        "Goose": 1000,
-        "Swan": 1000,
-        "Eagle": 1000,
-        "Hawk": 1000,
-        "Falcon": 1000,
-        "Parrot": 1000,
-        "Penguin": 1000,
-        "Woodpecker": 1000,
-        "Sparrow": 1000,
-        "Finch": 1000,
-        "Crow": 1000,
-        "Raven": 1000,
-        "Seagull": 1000,
+    "bird_subclasses": {
+        # Small birds
+        "Sparrow": 2000,
+        "Finch": 2000,
 
-        # Negative classes
+        # Raptors
+        "Eagle": 1500,
+        "Hawk": 1500,
+        "Falcon": 1500,
+        "Owl": 1500,
+        "Bird of prey": 1500,
+
+        # Waterfowl
+        "Duck": 2000,
+        "Goose": 2000,
+        "Swan": 2000,
+        "Water bird": 2000,
+
+        # Corvids
+        "Crow": 1500,
+        "Raven": 1500,
+
+        # Other bird groups
+        "Parrot": 1500,
+        "Penguin": 1500,
+        "Woodpecker": 1500,
+        "Seagull": 1500,
+
+        # Generic bird
+        "Bird": 3000,
+
+        # Negatives
         "Squirrel": 4000,
         "Cat": 3000,
         "Dog": 3000,
@@ -241,8 +262,9 @@ def copy_whole_frame(sample, classifier_label, split, output_dir: Path, records)
 
 
 def export_dataset_for_class(dataset, class_name, args, records):
-    if class_name in POSITIVE_CLASSES:
-        classifier_label = POSITIVE_CLASSES[class_name]
+    # Updated classifier label logic
+    if class_name in BIRD_SUBCLASSES:
+        classifier_label = BIRD_SUBCLASSES[class_name]
     elif class_name in PRIMARY_ADVERSARY_CLASSES:
         classifier_label = PRIMARY_ADVERSARY_CLASSES[class_name]
     elif class_name in FEEDER_CONTEXT_CLASSES:
@@ -273,7 +295,7 @@ def export_dataset_for_class(dataset, class_name, args, records):
                 if crops_saved >= args.max_crops_per_image:
                     break
 
-        # 2) Export whole frame (for both detection + image-level)
+        # 2) Export whole frame
         if args.export_mode in ("whole", "both"):
             split = assign_split(0, 1, args)
             copy_whole_frame(sample, classifier_label, split, args.output_dir, records)
@@ -316,9 +338,9 @@ def main(args):
             max_samples=max_samples,
         )
 
-        # 2) Image-level dataset (only for bird classes)
+        # 2) Image-level dataset (only for valid bird subclasses)
         dataset_img = None
-        if class_name in POSITIVE_CLASSES:
+        if class_name in BIRD_SUBCLASSES:
             dataset_img = load_openimages_imagelevel(
                 class_name=class_name,
                 split=args.openimages_split,
@@ -335,10 +357,10 @@ def main(args):
                 records=records,
             )
 
-        # Export image-level samples as whole frames labeled bird_present
+        # Export image-level samples as whole frames
         if dataset_img is not None:
             datasets.append(dataset_img)
-            classifier_label = POSITIVE_CLASSES[class_name]
+            classifier_label = BIRD_SUBCLASSES[class_name]
             print(f"\nExporting image-level class {class_name!r} as {classifier_label!r}")
             for sample in dataset_img:
                 split = assign_split(0, 1, args)
@@ -372,9 +394,9 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output-dir", type=str, default="./data/openimages_feeder_optimal")
+    parser.add_argument("--output-dir", type=str, default="./data/openimages_bird_subclasses")
     parser.add_argument("--openimages_split", type=str, default="train")
-    parser.add_argument("--preset", type=str, default="balanced_small")
+    parser.add_argument("--preset", type=str, default="bird_subclasses")
     parser.add_argument("--export-mode", type=str, default="both")
     parser.add_argument("--min-box-area", type=float, default=0.001)
     parser.add_argument("--max-crops-per-image", type=int, default=5)
